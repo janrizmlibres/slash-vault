@@ -1,185 +1,61 @@
-# Slash Vault - Chrome Card Extension
+# Slash Vault
 
-A secure Chrome extension for managing and autofilling virtual card information with team collaboration support.
+A Chrome extension that autofills [Slash](https://joinslash.com) virtual cards and billing addresses into checkout forms. Cards come from the Slash API. Addresses, field mappings and users live in Supabase. A small Express server on your machine sits between the two, so the Slash API key never reaches the browser.
 
-## ✨ Features
+## What it does
 
-- 🔐 **Supabase Authentication** - Secure email/password authentication
-- 👥 **Role-Based Access Control** - Admin and user roles with group-based card sharing
-- 💳 **Virtual Card Management** - Create, view, and manage virtual cards
-- 🔄 **Smart Autofill** - Intelligent card field detection and autofill
-- ⏱️ **Cooldown System** - Configurable card usage cooldown periods
-- 🎯 **Domain Mapping** - Map card fields for automatic detection
-- 🛡️ **Row-Level Security** - Supabase RLS ensures data isolation
+- **Cards.** The popup lists the cards in your Slash card group, with search and a CVV you reveal on demand. "Generate New Card" creates one through the Slash API.
+- **Addresses.** An admin bulk-imports addresses from CSV or TSV. Each card in the list is paired with an address by round robin, and the filter box narrows the pool by city or state.
+- **Autofill.** Fill a specific card from the popup, or press `Ctrl+Shift+F` to fill the next card that isn't cooling down. A used card and its address are held back for a cooldown period that admins set (30 minutes by default).
+- **Field mapping.** Right-click an input on a checkout page and pick what it is, such as Card Number, CVV or ZIP. Mappings are saved per domain as selector profiles, and admins can edit them as CSS or XPath selectors.
+- **Name detection.** Admins can add network profiles that read the shopper's name from a site's own API responses, by URL pattern and JSON path.
 
-## 🚀 Quick Start
+## Roles
 
-### Prerequisites
+Users sign up with email and password through Supabase Auth. Each new user gets their own Slash card group and sees only that group's cards. Admins see every card. They also get the admin panel, which holds the imports, the cooldown and both kinds of profile.
 
-- Node.js 16+ and npm
-- Chrome browser
-- Supabase account (free tier works)
+## Setup
 
-### Installation
+You need Node.js and Chrome. You also need a Supabase project and a Slash API key.
 
-1. **Clone and Install**
+1. Run `schema.sql` in the Supabase SQL editor. `schema_reset.sql` drops everything if you need to start over.
+2. Copy `.env.example` to `.env` and fill it in. The server also reads `SLASH_ACCOUNT_ID`, which card creation needs.
+
+   ```env
+   SUPABASE_URL=...
+   SUPABASE_KEY=...            # service role key, server only
+   VITE_SUPABASE_URL=...
+   VITE_SUPABASE_ANON_KEY=...  # anon key, bundled into the extension
+   SLASH_API_KEY=...
+   SLASH_ACCOUNT_ID=...
+   ```
+
+3. Install, build and start the server:
+
    ```bash
    npm install
+   npm run build    # or npm run dev to rebuild on change
+   npm run server   # Express on http://localhost:3000
    ```
 
-2. **Setup Supabase**
-   - Follow the detailed instructions in [SETUP.md](./SETUP.md)
-   - Create your Supabase project
-   - Run the database schema
-   - Configure environment variables
+4. In Chrome, open `chrome://extensions`, turn on Developer mode, click "Load unpacked" and pick `dist/`.
 
-3. **Build the Extension**
-   ```bash
-   npm run build
-   ```
+To make someone an admin, set their `role` to `admin` in the `users` table.
 
-4. **Start the Backend**
-   ```bash
-   npm run server
-   ```
-
-5. **Load in Chrome**
-   - Go to `chrome://extensions/`
-   - Enable "Developer mode"
-   - Click "Load unpacked"
-   - Select the `dist` folder
-
-## 📚 Documentation
-
-- **[SETUP.md](./SETUP.md)** - Detailed setup and configuration guide
-- **[AUTH_IMPLEMENTATION.md](./AUTH_IMPLEMENTATION.md)** - Authentication system reference
-- **[PROJECT.md](./PROJECT.md)** - Original project specifications
-
-## 🔑 Authentication
-
-The extension uses Supabase Auth with two user roles:
-
-### Admin Users
-- Access to all cards across groups
-- Can configure global settings
-- Manage domain mappings
-- View and manage all selector profiles
-
-### Regular Users
-- Access to cards within their group only
-- Can create and use cards
-- Manage their own selector profiles
-- Collaborate with team members in same group
-
-## 🎯 Usage
-
-1. **Sign Up / Login**
-   - Open the extension
-   - Create an account or sign in
-   - Optionally provide a group ID to join a team
-
-2. **Create Cards**
-   - Click "Generate New Card"
-   - Cards are automatically added to your vault
-
-3. **Map Card Fields**
-   - Navigate to a checkout page
-   - Right-click on card input fields
-   - Select the field type (Card Number, Expiry, CVV)
-   - Mappings are saved per domain
-
-4. **Autofill Cards**
-   - Click "Autofill Next Card" for smart selection
-   - Or click "Autofill" on a specific card
-   - Fields are automatically filled based on saved mappings
-
-## 🏗️ Architecture
+## Layout
 
 ```
-├── src/
-│   ├── popup/          # Extension popup UI (React)
-│   ├── background/     # Service worker for API calls
-│   ├── content/        # Content script for page interaction
-│   ├── lib/            # Shared utilities and types
-│   └── components/     # React components
-├── server/             # Express backend API
-│   ├── index.ts        # Main server
-│   ├── supabase.ts     # Supabase client
-│   └── migrations/     # Database migrations
-└── public/             # Static assets
+src/popup/       React popup (400x600)
+src/background/  service worker that talks to the server, context menus, the shortcut
+src/content/     content script that maps fields and fills them
+server/          Express API over Supabase and Slash
+schema.sql       tables and row-level security policies
 ```
 
-## 🛠️ Development
+## Status
 
-### Available Scripts
+Built for one client and run from localhost. The server trusts the user ID and role the extension sends, so don't expose it beyond your own machine. There are no automated tests.
 
-```bash
-npm run dev         # Build extension in watch mode
-npm run build       # Build for production
-npm run server      # Start backend server
-npm run seed        # Seed database with test data
-```
+## License
 
-### Tech Stack
-
-- **Frontend**: React 19, TypeScript, Tailwind CSS
-- **Backend**: Express, Node.js
-- **Database**: Supabase (PostgreSQL)
-- **Build Tool**: Vite
-- **Authentication**: Supabase Auth
-
-## 🔒 Security
-
-- Row-Level Security (RLS) policies enforce access control
-- Anon key used in extension (safe for client-side)
-- Service role key only in backend server
-- Chrome storage for secure session persistence
-- HTTPS required for production API
-
-## 📝 Environment Variables
-
-Create a `.env` file (see `.env.example`):
-
-```env
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_service_role_key
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_anon_key
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📄 License
-
-ISC
-
-## 🆘 Troubleshooting
-
-### Common Issues
-
-**Cards not showing?**
-- Check your group ID matches the cards' group ID
-- Verify you're logged in
-- Ensure RLS policies are enabled
-
-**Autofill not working?**
-- Map the fields first (right-click on inputs)
-- Check console for errors
-- Verify selector profiles are saved
-
-**Auth errors?**
-- Verify Supabase credentials in `.env`
-- Check Supabase project is running
-- Ensure auth is enabled in Supabase dashboard
-
-For more help, see [SETUP.md](./SETUP.md) or [AUTH_IMPLEMENTATION.md](./AUTH_IMPLEMENTATION.md)
-
----
-
-Built with ❤️ using Supabase, React, and Chrome Extensions API
+ISC, as declared in `package.json`.
