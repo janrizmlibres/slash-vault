@@ -58,4 +58,4 @@ Built for one client and run from localhost. The server trusts the user ID and r
 
 ## License
 
-ISC, as declared in `package.json`.
+ISC. See [LICENSE](LICENSE).
